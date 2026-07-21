@@ -1,0 +1,1 @@
+This repository contains code I used to setup Ollama offline for Agentic Ai Development environment.
