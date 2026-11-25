@@ -20,6 +20,7 @@ class Settings:
     embedding_model: str = "nomic-embed-text:latest"
     model_timeout: int = 180
     local_demo_access: bool = True
+    order_reference: str = ""
 
     def __post_init__(self):
         if len(self.api_token) < 16 or self.api_token == "replace-with-a-long-private-token":
@@ -43,4 +44,5 @@ class Settings:
                    spree_url=os.getenv("SPREE_BASE_URL", "http://localhost:3000").rstrip("/"),
                    spree_key=os.getenv("SPREE_API_KEY", ""), ollama_url=os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/"),
                    model=os.getenv("OLLAMA_MODEL", "qwen3:1.7b"), embedding_model=os.getenv("EMBEDDING_MODEL", "nomic-embed-text:latest"),
-                   local_demo_access=os.getenv("LOCAL_DEMO_ACCESS", "true").lower() == "true")
+                   local_demo_access=os.getenv("LOCAL_DEMO_ACCESS", "true").lower() == "true",
+                   order_reference=os.getenv("DEFAULT_ORDER_REFERENCE", "").strip())

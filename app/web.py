@@ -126,15 +126,14 @@ def shell(name, settings, storage, spree, model):
 
     @app.get('/v1/config', dependencies=[Depends(auth)])
     def config():
-        demo_file = Path(__file__).resolve().parents[1] / 'examples/live-order.json'
-        demo_reference = json.loads(demo_file.read_text())['number'] if settings.mode == 'live' and demo_file.exists() else 'DEMO1007'
+        reference = settings.order_reference or ('DEMO1007' if settings.mode == 'fixture' else '')
         return {'app': name, 'source_mode': settings.mode, 'store_id': settings.store_id, 'model': settings.model,
-                'embedding_model': settings.embedding_model, 'demo_order_reference': demo_reference,
+                'embedding_model': settings.embedding_model, 'default_order_reference': reference,
                 'permissions': 'Single demo staff role; read-only Spree; local approvals only'}
 
     @app.get('/v1/examples/{filename}', dependencies=[Depends(auth)])
     def example(filename: str):
-        allowed = {'delivery-policy.md', 'returns-policy.md', 'invoice.txt', 'packing-slip.txt', 'live-invoice.txt', 'live-packing-slip.txt'}
+        allowed = {'delivery-policy.md', 'returns-policy.md'}
         path = Path(__file__).resolve().parents[1] / 'examples' / filename
         if filename not in allowed or not path.is_file():
             raise AppError('example_not_found', 'Demo example not found.', 404)

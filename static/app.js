@@ -325,7 +325,7 @@ async function openWorkspace() {
     $('model-label').textContent = config.model;
     $('setting-model').textContent = config.model;
     $('setting-source').textContent = config.source_mode === 'live' ? 'Live Spree' : 'Demo fixtures';
-    if (project === 'COA') { $('reference').value = config.demo_order_reference; await loadPolicies(); }
+    if (project === 'COA') { $('reference').value = config.default_order_reference; await loadPolicies(); }
     await loadReports();
   } catch (error) {
     config = null;

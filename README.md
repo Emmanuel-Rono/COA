@@ -1,144 +1,159 @@
-# COA — Commerce Operations Agent
+# COA | Commerce Operations Agent
 
-COA helps staff inspect a Spree order, find a relevant policy, and prepare a response.
-Qwen chooses from two read-only tools. The app shows current order facts, policy
-citations and the tool trace. A person reviews the draft. Approval saves it locally;
-it does not send a message or change Spree.
+COA brings Spree order records and store policies into one workspace. Support staff
+can investigate an order, inspect the supporting evidence, and prepare a customer
+response for review without switching between the commerce platform and policy documents.
 
-## Simple design
+## Features
+
+- Order investigations through typed, read-only Spree tools.
+- Policy retrieval using local embeddings, versioned documents and page citations.
+- Browser conversations with Qwen, including follow-up questions about a selected report.
+- Structured findings, response drafts, source evidence and tool-call traces.
+- Internal approval and rejection with review notes and version checks.
+- Persistent reports in SQLite, with JSON downloads.
+- Light and dark themes, responsive layouts and saved appearance preferences.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-  User[Small web page] --> API[Python / FastAPI]
-  API --> Agent[Bounded tool loop]
-  Agent --> Spree[Spree order API / GET only]
-  Agent --> RAG[Policy search]
-  RAG --> Ollama[Local embeddings]
-  RAG --> DB[(SQLite: chunks and vectors)]
-  Agent --> Qwen[Local Qwen: internal draft]
-  Qwen --> Review[Human review]
-  Review --> DB
+    UI[Web dashboard] --> API[FastAPI]
+    API --> Agent[Operations agent]
+    Agent --> Spree[Spree Admin API]
+    Agent --> Retrieval[Policy retrieval]
+    Retrieval --> Embeddings[Ollama embeddings]
+    Retrieval --> Database[(SQLite)]
+    Agent --> Model[Local Qwen]
+    Model --> Report[Evidence and response draft]
+    Report --> Review[Staff review]
+    Review --> Database
 ```
 
-One app, one database, two external dependencies: Spree and Ollama.
-Policies use embeddings because users may describe the same rule in different words.
-Order facts use the API because status can change. SQLite vector search is a simple
-Python cosine calculation over a small policy library; Qdrant is a later scaling choice.
+Live order facts come from Spree. Store guidance comes from indexed policy documents.
+The application validates tool arguments and evidence identifiers before returning a
+report. Staff review drafts before using them in customer communication.
 
-## Install and run
+| Component | Technology |
+| --- | --- |
+| Application API | Python 3.13, FastAPI, Pydantic |
+| Model inference | Ollama, Qwen 3 |
+| Policy embeddings | nomic-embed-text |
+| Commerce integration | HTTPX, Spree 6 Admin API v3 |
+| Persistence | SQLite |
+| Dashboard | HTML, CSS, JavaScript |
+| Automated checks | pytest, GitHub Actions |
 
-Python 3.13 and Ollama are required. Start Ollama and prepare these models:
+[Architecture and API reference](docs/architecture.md)
+
+## Installation
+
+Install Python 3.13, Git and Ollama. Keep Ollama running in the background.
+For live order access, run a Spree 6 store separately.
 
 ```powershell
-ollama pull qwen3:1.7b
-ollama pull nomic-embed-text
+git clone https://github.com/Emmanuel-Rono/COA.git
+cd COA
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.lock.txt
 .\.venv\Scripts\python.exe configure.py
-.\.venv\Scripts\python.exe -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8001 --workers 1
+ollama pull qwen3:1.7b
+ollama pull nomic-embed-text
 ```
 
-Open **http://localhost:8001**. Copy `APP_API_TOKEN` from your private `.env` into
-the access form. Click **Load demo delivery policy**, then investigate `DEMO1007`.
-CPU processing can take several minutes. Run one task at a time. No hosted model account or cloud key is required.
+`configure.py` creates a private `.env` file and a server signing key. Existing
+configuration is preserved. The dashboard opens a local browser session automatically;
+users do not enter service keys in the interface.
 
-Default `SPREE_MODE=fixture` uses the clearly labelled records in `examples/store.json`.
-Qwen inference and embeddings are real in both modes. Fixture mode never silently
-replaces a failed live API request.
+## Configuration
 
-## Connect your Spree store
+The default `SPREE_MODE=fixture` uses the sample order records in `examples/store.json`.
+Model inference and policy embeddings still run through Ollama.
 
-This adapter targets **Spree 6.0.6, Admin API v3**. Start Spree separately.
-Create a server-side secret key with `read_orders,read_fulfillments,read_products` permissions.
-Set these private settings:
+For live Spree access, edit `.env`:
 
 ```dotenv
 SPREE_MODE=live
 SPREE_BASE_URL=http://localhost:3000
 SPREE_API_KEY=sk_your_read_only_key
-STORE_ID=your_actual_store_id
+STORE_ID=your_store_id
+DEFAULT_ORDER_REFERENCE=your_order_number
 ```
 
-Use a real order number or `or_` ID in the form. The key selects its store;
-`STORE_ID` must agree with it. The adapter returns only whitelisted fields and
-omits customer email, address and internal notes before model processing.
+Use a secret key scoped to `read_orders`, `read_fulfillments` and `read_products`.
+The key selects the store; `STORE_ID` identifies that same store. Keep keys and local
+order references in `.env`. All available settings are listed in `.env.example`.
 
-An optional `seed_demo.py` adds 50 demo products and one unpaid draft order to a
-local development store. It requires explicit confirmation and creates a temporary
-setup key, then revokes it. Run only with permission on a disposable local store:
+## Run
 
 ```powershell
-.\.venv\Scripts\python.exe seed_demo.py --spree-dir D:\Codes\QA\Spree-store --confirm-local-demo
+.\.venv\Scripts\python.exe -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8001 --workers 1
 ```
 
-The runtime app has no write key or write API methods. A draft order is not a paid
-or shipped order. Live demo references can be recorded in `examples/live-order.json`.
+Open [localhost:8001](http://localhost:8001).
 
-## Tests and actual model check
+1. Open **Knowledge** and upload a policy or select **Load demo policy**.
+2. Return to **Assistant**, enter an order reference and select **Investigate order**.
+3. Inspect the response draft, recorded facts, citations and tool trace.
+4. Ask follow-up questions in the conversation panel.
+5. Add a review note and approve or reject the internal report.
+
+Use `DEMO1007` in fixture mode or an order number from your connected store in live mode.
+**Reports** opens saved investigations. **Settings** controls appearance and connection checks.
+The model loads when a request is submitted. Run one investigation at a time on CPU.
+
+## Testing
+
+Run the automated suite without starting Spree or loading a model:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q --junitxml=reports/tests.xml
-.\.venv\Scripts\python.exe verify_demo.py
 ```
 
-Pytest uses isolated fixtures and model doubles to test defined behaviours without
-requiring servers. `verify_demo.py` separately exercises actual local inference,
-embeddings, configured order access, citation validation and internal approval.
-It saves the measured run in `reports/real-model-smoke.json`. Reports are private.
-See [verification](docs/verification.md) for measured results and limits.
+The suite covers session access, request origins, store boundaries, read-only API
+requests, tool restrictions, citation validation, policy lifecycle, report persistence,
+review decisions and browser-chat API contracts.
 
-## Files you should understand
+Run the integration check against your configured Ollama models and order source:
 
-| File | Responsibility |
-| --- | --- |
-| `app/main.py` | Request validation and investigation endpoints |
-| `app/agent.py` | Two allowed tools, five-call limit and cited draft validation |
-| `app/spree.py` | Read-only live adapter and explicit fixture mode |
-| `app/knowledge.py` | Policy ingestion, versioning, embeddings and retrieval |
-| `app/model.py` | Ollama HTTP requests and one schema-repair attempt |
-| `app/storage.py` | Durable runs, audit events and versioned review decisions |
-| `static/` | Plain HTML, CSS and JavaScript interface |
+```powershell
+.\.venv\Scripts\python.exe verify_integration.py --order-reference YOUR_ORDER_NUMBER
+```
 
-The request path is: validate staff token → resolve configured store → let Qwen
-choose an allowed tool → retrieve data → generate and validate a draft → human review.
-The code owns permissions and calculations; the model does not.
+In fixture mode, omit `--order-reference` to use `DEMO1007`. The check indexes a policy,
+investigates the order, validates returned evidence, approves an internal report and
+checks the saved review. It uses a temporary application database and writes the result
+to `reports/integration.json`. Spree records remain unchanged.
 
-## Boundaries and next steps
+GitHub Actions runs the isolated pytest suite on pushes and pull requests and uploads
+JUnit results. Integration checks use the separately configured local services.
 
-- This is a single-store demo with one staff token, not multi-user production auth.
-- PDF text, TXT and Markdown policies are supported. Scans need future OCR.
-- Retrieved source IDs are validated. This does not prove every generated sentence
-  is correct; inspect the sources and draft before approval.
-- Conflicting policies and malicious document content need broader evaluation.
-- Requests run synchronously. Interrupted runs become failed on restart. Use one
-  worker. A queue and multi-process deployment are later work.
-- Search uses up to five chunks, roughly 300 words with 60-word overlap per page.
-  The similarity cutoff is an initial setting, not a measured accuracy claim.
-- Changing the embedding model requires re-uploading policies. Same-title uploads
-  replace the active version; deletion removes its chunks from retrieval. Existing
-  reports retain the source snapshot used when they were created.
+## Repository structure
 
-## Docker and GitHub
+```text
+app/                    API, agent, retrieval, model client and persistence
+static/                 Dashboard, themes and browser interactions
+examples/               Sample policies and test order fixtures
+tests/                  Automated application and access-control tests
+docs/architecture.md    Design decisions and API reference
+configure.py            Private environment setup
+verify_integration.py   Explicit integration check using local services
+requirements.lock.txt   Pinned application and test dependencies
+```
 
-`docker compose up --build` runs this app on port 8001 with its own data volume.
-The compose file assumes Docker Desktop: Ollama and Spree run on the host.
-Images use a Python minor-version tag, not a verified immutable/offline release.
-Keep `.env`, `data/`, tokens and local reports out of GitHub.
+## Operating scope
 
-This folder is a standalone repository candidate. Publish it separately from BDA.
-Its GitHub Actions workflow runs isolated tests on push and pull request. It does
-not provision Spree, download models, run real inference, or deploy a public demo.
-For a CV, share the repo, a short local demo recording, and the verified status.
-GitHub hosts the source; an interactive demo needs a separate Python host with
-access to Ollama and Spree. Do not expose your local model/API ports directly.
+COA serves one configured store and one local staff workspace. Browser sessions are
+restricted to loopback access and use signed HttpOnly cookies with origin checks.
+Programmatic API calls use the server token. Spree credentials stay on the server.
 
-Back up `.env` and `data/` privately before changing versions. Restore both with
-the compatible source version to roll back. For a fresh demo, stop the app and
-archive `data/`; the next startup creates a new SQLite database.
+Policy ingestion supports text PDFs, TXT and Markdown. Investigations use a maximum
+of five allowed tool calls. Processing is synchronous and runs in one server worker.
+Interrupted investigations are marked failed after restart.
 
-Built with AI coding assistance. Review and rebuild the main flow before claiming
-independent authorship or production experience.
+Approvals save internal artifacts. Customer messaging, refunds and commerce record
+updates are outside the application's actions. Source identifiers are validated;
+staff remain responsible for reviewing the meaning and accuracy of generated text.
 
-References: [Spree Admin API](https://spreecommerce.org/docs/api-reference/admin-api/authentication),
-[Ollama tools](https://docs.ollama.com/capabilities/tool-calling),
-[Ollama embeddings](https://docs.ollama.com/api/embed).
+Local configuration, databases, uploads, model files and reports are excluded from
+version control. Back up `.env` and `data/` privately before replacing an installation.
