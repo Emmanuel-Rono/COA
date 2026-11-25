@@ -1,0 +1,52 @@
+{
+  "recorded_date": "2026-11-25",
+  "os": "Windows-11-10.0.26300-SP0",
+  "python": "3.13.11",
+  "cpu": "Intel Core i5-10310U",
+  "ram_bytes": 16942211072,
+  "inference": "CPU (Ollama reports size_vram=0)",
+  "spree_version": "6.0.6",
+  "spree_cli_version": "3.8.1",
+  "models": [
+    {
+      "name": "qwen3:1.7b",
+      "digest": "8f68893c685c3ddff2aa3fffce2aa60a30bb2da65ca488b61fff134a4d1730e7",
+      "size_bytes": 1359293444,
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "qwen3",
+        "families": [
+          "qwen3"
+        ],
+        "parameter_size": "2.0B",
+        "quantization_level": "Q4_K_M",
+        "context_length": 40960,
+        "embedding_length": 2048,
+        "runner": "ggml"
+      },
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "nomic-embed-text:latest",
+      "digest": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f",
+      "size_bytes": 274302450,
+      "details": {
+        "parent_model": "",
+        "format": "gguf",
+        "family": "nomic-bert",
+        "families": [
+          "nomic-bert"
+        ],
+        "parameter_size": "137M",
+        "quantization_level": "F16",
+        "context_length": 2048,
+        "embedding_length": 768,
+        "runner": "ggml"
+      },
+      "license": "Apache-2.0"
+    }
+  ],
+  "dependency_lock_sha256": "dc9d9d24a08f817af0083e146ac0307353c3fcc9de3be7cf79d04653b6b1d7b2",
+  "notice": "A local configuration record, not an offline verification or benchmark result."
+}
